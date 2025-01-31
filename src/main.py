@@ -26,13 +26,14 @@ from src.utils import slugify, remove_dash_values
 from src.xls_file import XLSFile
 
 
-ROOT_DIR = Path(os.path.dirname(sys.argv[0]))
-LOGGER_PATH = ROOT_DIR / "conceptz.log"
-HTML_DIR = ROOT_DIR / "html"
+ROOT_DIR = Path(os.path.dirname(sys.argv[0]))  # .exe filepath
+APP_DIR = Path.home() / "AppData" / "Local" / "conceptz"
+TEMP_DIR = Path.home() / "AppData" / "Local" / "Temp" / "conceptz"
+os.makedirs(APP_DIR, exist_ok=True)
+os.makedirs(TEMP_DIR, exist_ok=True)
 
-
+LOGGER_PATH = APP_DIR / "conceptz.log"
 logger.add(LOGGER_PATH, format="{time} | {level} | {message}", level="INFO")
-os.makedirs(HTML_DIR, exist_ok=True)
 
 
 class App:
@@ -57,7 +58,7 @@ class App:
 
         template_path = ROOT_DIR / template
         rendered_html = Template(template_path).render(concept=concept_row, info_groups=info_groups)
-        html_path = HTML_DIR / f"{slugify(concept)}.html"
+        html_path = TEMP_DIR / f"{slugify(concept)}.html"
         with open(html_path, "w", encoding="utf-8") as file:
             file.write(rendered_html)
 
@@ -70,7 +71,7 @@ class App:
 
         template_path = ROOT_DIR / template
         rendered_html = Template(template_path).render(section=section, info=info_rows)
-        html_path = HTML_DIR / f"{slugify(section)}.html"
+        html_path = TEMP_DIR / f"{slugify(section)}.html"
         with open(html_path, "w", encoding="utf-8") as file:
             file.write(rendered_html)
 
