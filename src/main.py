@@ -13,17 +13,18 @@ https://stackoverflow.com/questions/31189727/python-reading-large-excel-workshee
 """
 
 import argparse
+import itertools
 import os
 import sys
 import webbrowser
-from itertools import groupby
 from pathlib import Path
+from typing import Optional
 
 from loguru import logger
 
 from src.template import Template
-from src.utils import slugify, remove_dash_values
-from src.xls_file import XLSFile
+from src.utils.misc import slugify
+from src.utils.xls_file import XLSFile
 
 
 ROOT_DIR = Path(os.path.dirname(sys.argv[0]))  # .exe filepath
@@ -36,74 +37,51 @@ LOGGER_PATH = APP_DIR / "conceptz.log"
 logger.add(LOGGER_PATH, format="{time} | {level} | {message}", level="INFO")
 
 
-class App:
+def collect_info(xls_path: Path, key: str, value: str, groupby: Optional[str] = None) -> list:
+    xls = XLSFile(xls_path)
+    data = xls.search("Info", key=key, value=value)
+    if not groupby:
+        return data
+    return [
+        {
+            groupby: group_key,
+            "Info": list(group)
+        }
+        for group_key, group in itertools.groupby(data, key=lambda x: x[groupby])
+    ]
 
-    def __init__(self, xls_path: Path) -> None:
-        self._xls = XLSFile(xls_path)
 
-    def create_html_for_concept(self, template: str, concept: str) -> Path:
-
-        concept_row = self._xls.search("Concepts", key="Name", value=concept, only_first=True)[0]
-        concept_id = concept_row["ID"]
-        info_rows = self._xls.search("Info", key="Concept ID", value=concept_id)
-        remove_dash_values([concept_row] + info_rows)
-
-        info_groups = [
-            {
-                "section": key,
-                "info": list(group)
-            }
-            for key, group in groupby(info_rows, key=lambda x: x["Section"])
-        ]
-
-        template_path = ROOT_DIR / template
-        rendered_html = Template(template_path).render(concept=concept_row, info_groups=info_groups)
-        html_path = TEMP_DIR / f"{slugify(concept)}.html"
-        with open(html_path, "w", encoding="utf-8") as file:
-            file.write(rendered_html)
-
-        return html_path
-
-    def create_html_for_section(self, template: str, section: str) -> Path:
-
-        info_rows = self._xls.search("Info", key="Section", value=section)
-        remove_dash_values(info_rows)
-
-        template_path = ROOT_DIR / template
-        rendered_html = Template(template_path).render(section=section, info=info_rows)
-        html_path = TEMP_DIR / f"{slugify(section)}.html"
-        with open(html_path, "w", encoding="utf-8") as file:
-            file.write(rendered_html)
-
-        return html_path
+def create_html(template_path: Path, value: str, data: list) -> Path:
+    rendered_html = Template(template_path).render(value=value, data=data)
+    html_path = TEMP_DIR / f"{slugify(value)}.html"
+    with open(html_path, "w", encoding="utf-8") as file:
+        file.write(rendered_html)
+    return html_path
 
 
 @logger.catch
 def main() -> None:
-
     parser = argparse.ArgumentParser()
     parser.add_argument("xls_path", type=str)
     parser.add_argument("-t", "--template", type=str)
-    parser.add_argument("-c", "--concept",  type=str)
-    parser.add_argument("-s", "--section", type=str)
+    parser.add_argument("-k", "--key",  type=str)
+    parser.add_argument("-v", "--value", type=str)
+    parser.add_argument("-g", "--groupby", type=str)
     args = parser.parse_args()
 
-    app = App(Path(args.xls_path))
-    if args.concept:
-        html_path = app.create_html_for_concept(args.template, args.concept)
-        webbrowser.open(str(html_path), new=2)
-    if args.section:
-        html_path = app.create_html_for_section(args.template, args.section)
-        webbrowser.open(str(html_path), new=2)
+    data = collect_info(
+        xls_path=Path(args.xls_path),
+        key=args.key,
+        value=args.value,
+        groupby=args.groupby
+    )
+    html_path = create_html(
+        template_path=(ROOT_DIR / args.template),
+        value=args.value,
+        data=data
+    )
+    webbrowser.open(str(html_path), new=2)
 
 
 if __name__ == '__main__':
     main()
-
-
-# debug
-# C:\Users\Denis\PythonProjects\conceptz\venv\Scripts\python C:\Users\Denis\PythonProjects\conceptz\src\main.py C:\Users\Denis\Desktop\CONCEPTZ\conceptz.xlsm --template "concept.html" --concept "Orchestration"
-# C:\Users\Denis\PythonProjects\conceptz\venv\Scripts\python C:\Users\Denis\PythonProjects\conceptz\src\main.py C:\Users\Denis\Desktop\CONCEPTZ\conceptz.xlsm --template "section.html" --section "69 Producer Hacks in 420 Seconds , Ep 02"
-# C:\Users\Denis\Desktop\CONCEPTZ\conceptz.exe C:\Users\Denis\Desktop\CONCEPTZ\conceptz.xlsm --template "concept.html" --concept "Orchestration"
-# C:\Users\Denis\Desktop\CONCEPTZ\conceptz.exe C:\Users\Denis\Desktop\CONCEPTZ\conceptz.xlsm --template "section.html" --section "69 Producer Hacks in 420 Seconds , Ep 02"
-
