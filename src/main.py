@@ -42,6 +42,7 @@ def collect_info(xls_path: Path, key: str, value: str, groupby: Optional[str] = 
     data = xls.search("Info", key=key, value=value)
     if not groupby:
         return data
+    data.sort(key=lambda x: x[groupby] or "")
     return [
         {
             groupby: group_key,

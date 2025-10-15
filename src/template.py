@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 from typing import Optional
 
@@ -5,14 +6,25 @@ from jinja2 import Template as JinjaTemplate
 from jinja2.filters import FILTERS
 
 
-def format_mailru_screenshoter_link(value: Optional[str]) -> Optional[str]:
-    """ Для Screenshoter Mail.ru - делает прямые ссылки на скриншоты """
-    if value is None:
-        return value
-    if "mail.ru" not in value:
-        return value
-    xxxx, yyyyyyyyy = value.split('/')[-2:]
-    return f"https://thumb.cloud.mail.ru/weblink/thumb/xw1/{xxxx}/{yyyyyyyyy}"
+def cloudshot_link(url: Optional[str]) -> Optional[str]:
+    pattern = r"^https://drive\.google\.com/uc\?id=([a-zA-Z0-9_-]+)$"
+    match = re.match(pattern, str(url))
+    if match:
+        file_id = match.group(1)
+        return f"https://drive.google.com/thumbnail?id={file_id}&sz=w1000"
+    else:
+        return url
+
+
+def screenshoter_link(url: Optional[str]) -> Optional[str]:
+    pattern = r"^https://s\.mail\.ru/([^/]+)/([^/]+)$"
+    match = re.match(pattern, str(url))
+    if match:
+        part1 = match.group(1)
+        part2 = match.group(2)
+        return f"https://thumb.cloud.mail.ru/weblink/thumb/xw1/{part1}/{part2}"
+    else:
+        return url
 
 
 def join_timestamp(args: list[Optional[str]]) -> Optional[str]:
@@ -50,9 +62,10 @@ def format_timestamp(timestamp: Optional[str]) -> Optional[str]:
         return ":".join([str(m), str(s).zfill(2)])
 
 
-FILTERS["mailru"] = format_mailru_screenshoter_link
-FILTERS["jointime"] = join_timestamp
-FILTERS["timestamp"] = format_timestamp
+FILTERS["cloudshot_link"] = cloudshot_link
+FILTERS["screenshoter_link"] = screenshoter_link
+FILTERS["join_timestamp"] = join_timestamp
+FILTERS["format_timestamp"] = format_timestamp
 
 
 class Template:
